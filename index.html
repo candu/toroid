@@ -18,16 +18,24 @@
 
 <style>
 html, body, #map {
-  min-width: 100%;
+  min-width: 960px;
   min-height: 100%;
   height: 100%;
   padding: 0;
   margin: 0;
 }
 
-#controls_wrapper {
+#nav {
   position: absolute;
   top: 0;
+  right: 0;
+  padding: 10px;
+}
+
+#search {
+  width: 320px;
+  position: absolute;
+  bottom: 0;
   right: 0;
   padding: 10px;
 }
@@ -36,9 +44,28 @@ html, body, #map {
 </head>
 <body>
 <div id="map"></div>
-<div id="controls_wrapper">
+<div id="nav">
   <div class="btn-group">
     <div class="btn btn-default" id="btn_world">world</div>
+    <div class="btn btn-default" id="btn_nearby">nearby</div>
+  </div>
+</div>
+<div id="search">
+  <div class="panel-group" id="search_options">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h4 class="panel-title">
+          <a data-toggle="collapse" data-parent="#search_options" href="#panel_search_options">
+            Search Tor Nodes
+          </a>
+        </h4>
+      </div>
+      <div id="panel_search_options" class="panel-collapse collapse">
+        <div class="panel-body">
+          Not much to see here...yet.
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <script>
@@ -68,6 +95,12 @@ d3.json('/tor.json', function(data) {
 });
 
 $('#btn_world').click(viewWorld);
+$('#btn_nearby').click(function() {
+  map.locate({
+    setView: true,
+    maxZoom: map.getZoom()
+  });
+});
 </script>
 </body>
 </html>
