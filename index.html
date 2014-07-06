@@ -1,0 +1,73 @@
+<html>
+<head>
+<script src="//oss.maxcdn.com/jquery/2.1.1/jquery.min.js"></script>
+
+<link rel="stylesheet" href="//oss.maxcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
+<script src="//oss.maxcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+
+<script src="//oss.maxcdn.com/d3js/3.4.6/d3.min.js"></script>
+
+<link rel="stylesheet" href="//oss.maxcdn.com/leaflet/0.7.2/leaflet.css" />
+<script src="//oss.maxcdn.com/leaflet/0.7.2/leaflet.js"></script>
+
+<link rel="stylesheet" href="/MarkerCluster.css" />
+<link rel="stylesheet" href="/MarkerCluster.Default.css" />
+<script src="/leaflet.markercluster.js"></script>
+
+<script src="//oss.maxcdn.com/underscorejs/1.6.0/underscore-min.js"></script>
+
+<style>
+html, body, #map {
+  min-width: 100%;
+  min-height: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+#controls_wrapper {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 10px;
+}
+
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="controls_wrapper">
+  <div class="btn-group">
+    <div class="btn btn-default" id="btn_world">world</div>
+  </div>
+</div>
+<script>
+var map = new L.Map('map', {
+  worldCopyJump: true
+});
+var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+var osmAttrib = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+var osm = new L.TileLayer(osmUrl, {minZoom: 2, maxZoom: 16, attribution: osmAttrib});
+
+function viewWorld() {
+  map.setView(new L.LatLng(0, 0), 2);
+}
+map.addLayer(osm);
+viewWorld();
+
+d3.json('/tor.json', function(data) {
+  var markers = new L.MarkerClusterGroup();
+  _.each(data.relays, function(relay) {
+    if (!relay.latitude || !relay.longitude) {
+      return;
+    }
+    var latLng = new L.LatLng(relay.latitude, relay.longitude);
+    var marker = markers.addLayer(new L.Marker(latLng));
+  });
+  map.addLayer(markers);
+});
+
+$('#btn_world').click(viewWorld);
+</script>
+</body>
+</html>
