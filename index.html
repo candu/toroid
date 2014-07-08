@@ -1,9 +1,11 @@
 <html>
 <head>
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" />
+
 <script src="//oss.maxcdn.com/jquery/2.1.1/jquery.min.js"></script>
 
-<link rel="stylesheet" href="//oss.maxcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
-<script src="//oss.maxcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
 
 <script src="//oss.maxcdn.com/d3js/3.4.6/d3.min.js"></script>
 
@@ -33,11 +35,40 @@ html, body, #map {
 }
 
 #search {
-  width: 320px;
+  width: 480px;
   position: absolute;
   bottom: 0;
   right: 0;
   padding: 10px;
+}
+
+#flags {
+  font-size: 18px;
+}
+
+.flag {
+  cursor: pointer;
+  display: inline-block;
+  padding: 6px;
+  border-radius: 6px;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.flag.text-muted {
+  color: #999;
+  opacity: 0.75;
+}
+
+.flag:hover {
+  background-color: #eee;
+}
+
+.btn.loading {
+
 }
 
 </style>
@@ -62,39 +93,129 @@ html, body, #map {
       </div>
       <div id="panel_search_options" class="panel-collapse collapse">
         <div class="panel-body">
-          Not much to see here...yet.
+          <h5>required flags</h5>
+          <div id="flags">
+            <span class="flag fa fa-bolt text-muted" title="Fast" data-flag="Fast"></span>
+            <span class="flag fa fa-code-fork" title="Running" data-flag="Running"></span>
+            <span class="flag fa fa-warning text-muted" title="BadExit" data-flag="BadExit"></span>
+            <span class="flag fa fa-user-md text-muted" title="Authority" data-flag="Authority"></span>
+            <span class="flag fa fa-shield text-muted" title="Guard" data-flag="Guard"></span>
+            <span class="flag fa fa-book text-muted" title="HSDir" data-flag="HSDir"></span>
+            <span class="flag fa fa-info text-muted" title="Named" data-flag="Named"></span>
+            <span class="flag fa fa-anchor text-muted" title="Stable" data-flag="Stable"></span>
+            <span class="flag fa fa-folder text-muted" title="V2Dir" data-flag="V2Dir"></span>
+            <span class="flag fa fa-check text-muted" title="Valid" data-flag="Valid"></span>
+            <span class="flag fa fa-question text-muted" title="Unnamed" data-flag="Unnamed"></span>
+            <span class="flag fa fa-sign-out text-muted" title="Exit" data-flag="Exit"></span>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
 <script>
-var map = new L.Map('map', {
-  worldCopyJump: true
-});
-var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-var osmAttrib = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
-var osm = new L.TileLayer(osmUrl, {minZoom: 2, maxZoom: 16, attribution: osmAttrib});
+var ToroidQuery = function() {
+  this._flags = [];
+};
+ToroidQuery.prototype.getFlags = function() {
+  return this._flags;
+};
+ToroidQuery.prototype.setFlags = function(flags) {
+  this._flags = flags;
+  return this;
+};
+ToroidQuery.prototype.matches = function(relay) {
+  if (!relay.latitude || !relay.longitude) {
+    return false;
+  }
+  for (var i = 0; i < this._flags.length; i++) {
+    if (!_.contains(relay.flags, this._flags[i])) {
+      return false;
+    }
+  }
+  return true;
+};
 
-function viewWorld() {
-  map.setView(new L.LatLng(0, 0), 2);
-}
-map.addLayer(osm);
-viewWorld();
-
-d3.json('/tor.json', function(data) {
-  var markers = new L.MarkerClusterGroup();
-  _.each(data.relays, function(relay) {
-    if (!relay.latitude || !relay.longitude) {
+var ToroidHandler = function(map, query) {
+  this._map = map;
+  this._relays = [];
+  this._query = query;
+  this._markerLayer = null;
+};
+ToroidHandler.prototype.getQuery = function() {
+  return this._query;
+};
+ToroidHandler.prototype.setRelays = function(relays) {
+  this._relays = relays;
+};
+ToroidHandler.prototype.viewWorld = function() {
+  this._map.setView(new L.LatLng(0, 0), 2);
+  return this;
+};
+ToroidHandler.prototype.executeQuery = function() {
+  if (this._markerLayer !== null) {
+    this._map.removeLayer(this._markerLayer);
+  }
+  this._markerLayer = new L.MarkerClusterGroup();
+  _.each(this._relays, function(relay) {
+    if (!this._query.matches(relay)) {
       return;
     }
     var latLng = new L.LatLng(relay.latitude, relay.longitude);
-    var marker = markers.addLayer(new L.Marker(latLng));
+    var marker = this._markerLayer.addLayer(new L.Marker(latLng));
+  }.bind(this));
+  this._map.addLayer(this._markerLayer);
+  return this;
+};
+
+function initHandler() {
+  var map = new L.Map('map', {
+    worldCopyJump: true
   });
-  map.addLayer(markers);
+  map.on('locatefound', function() {
+    $('#btn_nearby').removeClass('loading');
+  });
+  map.on('locateerror', function() {
+    $('#btn_nearby')
+      .removeClass('loading')
+      .addClass('disabled')
+      .prop('disabled', true);
+  });
+  var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osm = new L.TileLayer(osmUrl, {minZoom: 2, maxZoom: 16, attribution: osmAttrib});
+  map.addLayer(osm);
+
+  var query = new ToroidQuery();
+
+  return new ToroidHandler(map, query);
+}
+
+var handler = initHandler();
+handler.viewWorld();
+
+function updateFlags() {
+  var flags = [];
+  $('.flag').each(function(i, flag) {
+    if (!$(flag).hasClass('text-muted')) {
+      flags.push($(flag).data('flag'));
+    }
+  });
+  handler.getQuery().setFlags(flags);
+}
+
+d3.json('/tor.json', function(data) {
+  handler.setRelays(data.relays);
+  updateFlags();
+  handler.executeQuery();
+  $('.flag').click(function() {
+    $(this).toggleClass('text-muted');
+    updateFlags();
+    handler.executeQuery();
+  });
 });
 
-$('#btn_world').click(viewWorld);
+$('#btn_world').click(handler.viewWorld.bind(handler));
 $('#btn_nearby').click(function() {
   map.locate({
     setView: true,
