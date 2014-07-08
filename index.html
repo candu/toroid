@@ -152,6 +152,12 @@ ToroidHandler.prototype.viewWorld = function() {
   this._map.setView(new L.LatLng(0, 0), 2);
   return this;
 };
+ToroidHandler.prototype.viewNearby = function() {
+  this._map.locate({
+    setView: true,
+    maxZoom: this._map.getZoom()
+  });
+};
 ToroidHandler.prototype.executeQuery = function() {
   if (this._markerLayer !== null) {
     this._map.removeLayer(this._markerLayer);
@@ -216,12 +222,7 @@ d3.json('/tor.json', function(data) {
 });
 
 $('#btn_world').click(handler.viewWorld.bind(handler));
-$('#btn_nearby').click(function() {
-  map.locate({
-    setView: true,
-    maxZoom: map.getZoom()
-  });
-});
+$('#btn_nearby').click(handler.viewNearby.bind(handler));
 </script>
 </body>
 </html>
