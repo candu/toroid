@@ -190,9 +190,10 @@ ToroidHandler.prototype.executeQuery = function() {
       this._markersAttached[id] = false;
     }
   }.bind(this));
-  var numToRemove = toRemove.length;
-  var numToAdd = toAddAttached.length + toAddNotAttached.length;
-  if (numToRemove < numToAdd / 4) {
+  // NOTE: see https://github.com/Leaflet/Leaflet.markercluster/issues/59#issuecomment-9320628
+  // for the basis of this heuristic - in short, removing N markers takes about
+  // twice as long as adding N markers.
+  if (toRemove.length * 2 < toAddAttached.length) {
     this._markerLayer.removeLayers(toRemove);
     this._markerLayer.addLayers(toAddNotAttached);
   } else {
