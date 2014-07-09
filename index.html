@@ -125,9 +125,6 @@ ToroidQuery.prototype.setFlags = function(flags) {
   return this;
 };
 ToroidQuery.prototype.matches = function(relay) {
-  if (!relay.latitude || !relay.longitude) {
-    return false;
-  }
   for (var i = 0; i < this._flags.length; i++) {
     if (!_.contains(relay.flags, this._flags[i])) {
       return false;
@@ -138,15 +135,29 @@ ToroidQuery.prototype.matches = function(relay) {
 
 var ToroidHandler = function(map, query) {
   this._map = map;
-  this._relays = [];
   this._query = query;
-  this._markerLayer = null;
+  this._relays = [];
+  this._markers = {};
+  this._markersAttached = {};
+  this._markerLayer = new L.MarkerClusterGroup();
+  this._map.addLayer(this._markerLayer);
+};
+ToroidHandler._relayIsValid = function(relay) {
+  return _.has(relay, 'latitude') && _.has(relay, 'longitude');
 };
 ToroidHandler.prototype.getQuery = function() {
   return this._query;
 };
 ToroidHandler.prototype.setRelays = function(relays) {
-  this._relays = relays;
+  this._relays = _.filter(relays, ToroidHandler._relayIsValid);
+  this._markers = {};
+  this._markersAttached = {};
+  _.each(this._relays, function(relay) {
+    var id = relay.fingerprint;
+    var latLng = new L.LatLng(relay.latitude, relay.longitude);
+    this._markers[id] = new L.Marker(latLng);
+    this._markersAttached[id] = false;
+  }.bind(this));
 };
 ToroidHandler.prototype.viewWorld = function() {
   this._map.setView(new L.LatLng(0, 0), 2);
@@ -159,18 +170,36 @@ ToroidHandler.prototype.viewNearby = function() {
   });
 };
 ToroidHandler.prototype.executeQuery = function() {
-  if (this._markerLayer !== null) {
-    this._map.removeLayer(this._markerLayer);
-  }
-  this._markerLayer = new L.MarkerClusterGroup();
+  var toAddAttached = [];
+  var toAddNotAttached = [];
+  var toRemove = [];
   _.each(this._relays, function(relay) {
-    if (!this._query.matches(relay)) {
-      return;
+    var id = relay.fingerprint;
+    var matches = this._query.matches(relay);
+    var attached = this._markersAttached[id];
+    var marker = this._markers[id];
+    if (matches) {
+      if (attached) {
+        toAddAttached.push(marker);
+      } else {
+        toAddNotAttached.push(marker);
+      }
+      this._markersAttached[id] = true;
+    } else if (!matches && attached) {
+      toRemove.push(marker);
+      this._markersAttached[id] = false;
     }
-    var latLng = new L.LatLng(relay.latitude, relay.longitude);
-    var marker = this._markerLayer.addLayer(new L.Marker(latLng));
   }.bind(this));
-  this._map.addLayer(this._markerLayer);
+  var numToRemove = toRemove.length;
+  var numToAdd = toAddAttached.length + toAddNotAttached.length;
+  if (numToRemove < numToAdd / 4) {
+    this._markerLayer.removeLayers(toRemove);
+    this._markerLayer.addLayers(toAddNotAttached);
+  } else {
+    this._markerLayer.clearLayers();
+    this._markerLayer.addLayers(toAddAttached);
+    this._markerLayer.addLayers(toAddNotAttached);
+  }
   return this;
 };
 
