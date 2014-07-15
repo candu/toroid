@@ -13,7 +13,6 @@
 <script src="//oss.maxcdn.com/leaflet/0.7.2/leaflet.js"></script>
 
 <link rel="stylesheet" href="/MarkerCluster.css" />
-<link rel="stylesheet" href="/MarkerCluster.Default.css" />
 <script src="/leaflet.markercluster.js"></script>
 
 <script src="//oss.maxcdn.com/underscorejs/1.6.0/underscore-min.js"></script>
@@ -67,8 +66,13 @@ html, body, #map {
   background-color: #eee;
 }
 
-.btn.loading {
+.marker-cluster {
+  background-clip: padding-box;
+}
 
+.marker-cluster > div {
+  text-align: center;
+  font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
 }
 
 </style>
@@ -139,8 +143,38 @@ var ToroidHandler = function(map, query) {
   this._relays = [];
   this._markers = {};
   this._markersAttached = {};
-  this._markerLayer = new L.MarkerClusterGroup();
+  this._markerLayer = new L.MarkerClusterGroup({
+    iconCreateFunction: ToroidHandler._iconCreateFunction
+  });
   this._map.addLayer(this._markerLayer);
+};
+ToroidHandler._ICON_COLOR = d3.scale.sqrt()
+  .domain([50, 450, 1800])
+  .range([d3.rgb(110, 204, 57), d3.rgb(240, 194, 12), d3.rgb(241, 128, 23)])
+  .clamp(true);
+ToroidHandler._ICON_SIZE = d3.scale.sqrt()
+  .domain([50, 800])
+  .rangeRound([20, 80])
+  .clamp(true);
+ToroidHandler._FONT_SIZE = d3.scale.sqrt()
+  .domain([200, 1250])
+  .rangeRound([12, 30])
+  .clamp(true);
+ToroidHandler._iconCreateFunction = function(cluster) {
+  var n = cluster.getChildCount();
+  var color = ToroidHandler._ICON_COLOR(n);
+  var textColor = d3.rgb(color).darker(1);
+  console.log(textColor);
+  var size = ToroidHandler._ICON_SIZE(n);
+  var fontSize = ToroidHandler._FONT_SIZE(n);
+  var radius = Math.floor(size / 2);
+  var divStyle = 'width: ' + size + 'px; height: ' + size + 'px; border: 1px solid ' + textColor + '; border-radius: ' + radius + 'px; background-color: ' + color;
+  var spanStyle = 'color: ' + textColor + '; font-size: ' + fontSize + 'px; line-height: ' + size + 'px;';
+  return new L.DivIcon({
+    iconSize: new L.Point(size, size),
+    html: '<div style="' + divStyle + '"><span style="' + spanStyle + '">' + n + '</span></div>',
+    className: 'marker-cluster'
+  });
 };
 ToroidHandler._relayIsValid = function(relay) {
   return _.has(relay, 'latitude') && _.has(relay, 'longitude');
