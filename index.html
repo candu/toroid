@@ -164,7 +164,6 @@ ToroidHandler._iconCreateFunction = function(cluster) {
   var n = cluster.getChildCount();
   var color = ToroidHandler._ICON_COLOR(n);
   var textColor = d3.rgb(color).darker(1);
-  console.log(textColor);
   var size = ToroidHandler._ICON_SIZE(n);
   var fontSize = ToroidHandler._FONT_SIZE(n);
   var radius = Math.floor(size / 2);
@@ -204,7 +203,7 @@ ToroidHandler.prototype.viewNearby = function() {
   });
 };
 ToroidHandler.prototype.executeQuery = function() {
-  var toAddAttached = [];
+  var toAdd = [];
   var toAddNotAttached = [];
   var toRemove = [];
   _.each(this._relays, function(relay) {
@@ -213,9 +212,8 @@ ToroidHandler.prototype.executeQuery = function() {
     var attached = this._markersAttached[id];
     var marker = this._markers[id];
     if (matches) {
-      if (attached) {
-        toAddAttached.push(marker);
-      } else {
+      toAdd.push(marker);
+      if (!attached) {
         toAddNotAttached.push(marker);
       }
       this._markersAttached[id] = true;
@@ -227,13 +225,12 @@ ToroidHandler.prototype.executeQuery = function() {
   // NOTE: see https://github.com/Leaflet/Leaflet.markercluster/issues/59#issuecomment-9320628
   // for the basis of this heuristic - in short, removing N markers takes about
   // twice as long as adding N markers.
-  if (toRemove.length * 2 < toAddAttached.length) {
+  if (toRemove.length * 2 < (toAdd.length - toAddNotAttached.length)) {
     this._markerLayer.removeLayers(toRemove);
     this._markerLayer.addLayers(toAddNotAttached);
   } else {
     this._markerLayer.clearLayers();
-    this._markerLayer.addLayers(toAddAttached);
-    this._markerLayer.addLayers(toAddNotAttached);
+    this._markerLayer.addLayers(toAdd);
   }
   return this;
 };
