@@ -112,6 +112,10 @@ html, body, #map {
             <span class="flag fa fa-question text-muted" title="Unnamed" data-flag="Unnamed"></span>
             <span class="flag fa fa-sign-out text-muted" title="Exit" data-flag="Exit"></span>
           </div>
+          <h5>name contains</h5>
+          <div class="form-group">
+            <input class="form-control" id="name_contains" />
+          </div>
         </div>
       </div>
     </div>
@@ -120,6 +124,7 @@ html, body, #map {
 <script>
 var ToroidQuery = function() {
   this._flags = [];
+  this._nameContains = '';
 };
 ToroidQuery.prototype.getFlags = function() {
   return this._flags;
@@ -128,13 +133,20 @@ ToroidQuery.prototype.setFlags = function(flags) {
   this._flags = flags;
   return this;
 };
+ToroidQuery.prototype.getNameContains = function() {
+  return this._nameContains;
+};
+ToroidQuery.prototype.setNameContains = function(nameContains) {
+  this._nameContains = nameContains.toLowerCase();
+};
 ToroidQuery.prototype.matches = function(relay) {
   for (var i = 0; i < this._flags.length; i++) {
     if (!_.contains(relay.flags, this._flags[i])) {
       return false;
     }
   }
-  return true;
+  var nickname = relay.nickname.toLowerCase();
+  return nickname.indexOf(this._nameContains) !== -1;
 };
 
 var ToroidHandler = function(map, query) {
@@ -278,6 +290,12 @@ d3.json('/tor.json', function(data) {
   $('.flag').click(function() {
     $(this).toggleClass('text-muted');
     updateFlags();
+    handler.executeQuery();
+  });
+  $('#name_contains').keyup(function() {
+    var nameContains = $(this).val();
+    console.log(nameContains);
+    handler.getQuery().setNameContains(nameContains);
     handler.executeQuery();
   });
 });
