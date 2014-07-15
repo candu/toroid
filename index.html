@@ -41,6 +41,10 @@ html, body, #map {
   padding: 10px;
 }
 
+#chevron {
+  float: right;
+}
+
 #flags {
   font-size: 18px;
 }
@@ -89,15 +93,16 @@ html, body, #map {
   <div class="panel-group" id="search_options">
     <div class="panel panel-default">
       <div class="panel-heading">
+        <span id="chevron" class="glyphicon glyphicon-chevron-up"></span>
         <h4 class="panel-title">
-          <a data-toggle="collapse" data-parent="#search_options" href="#panel_search_options">
+          <a id="search_toggle" data-toggle="collapse" data-parent="#search_options" href="#panel_search_options">
             Search Tor Nodes
           </a>
         </h4>
       </div>
       <div id="panel_search_options" class="panel-collapse collapse">
         <div class="panel-body">
-          <h5>required flags</h5>
+          <h5>by flags</h5>
           <div id="flags">
             <span class="flag fa fa-bolt text-muted" title="Fast" data-flag="Fast"></span>
             <span class="flag fa fa-code-fork" title="Running" data-flag="Running"></span>
@@ -112,7 +117,7 @@ html, body, #map {
             <span class="flag fa fa-question text-muted" title="Unnamed" data-flag="Unnamed"></span>
             <span class="flag fa fa-sign-out text-muted" title="Exit" data-flag="Exit"></span>
           </div>
-          <h5>name contains</h5>
+          <h5>by name</h5>
           <div class="form-group">
             <input class="form-control" id="name_contains" />
           </div>
@@ -302,6 +307,12 @@ d3.json('/tor.json', function(data) {
 
 $('#btn_world').click(handler.viewWorld.bind(handler));
 $('#btn_nearby').click(handler.viewNearby.bind(handler));
+
+$('#search_toggle').click(function() {
+  $('#chevron')
+    .toggleClass('glyphicon-chevron-down')
+    .toggleClass('glyphicon-chevron-up');
+});
 </script>
 </body>
 </html>
