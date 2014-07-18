@@ -19,6 +19,8 @@
 
 <script src="//oss.maxcdn.com/spinjs/2.0.1/spin.min.js"></script>
 
+<script src="//oss.maxcdn.com/mustache.js/0.8.1/mustache.min.js"></script>
+
 <style>
 html, body, #map {
   min-width: 960px;
@@ -239,6 +241,15 @@ ToroidHandler._FONT_SIZE = d3.scale.sqrt()
   .domain([200, 1250])
   .rangeRound([12, 30])
   .clamp(true);
+
+ToroidHandler._MARKER_POPUP_TEMPLATE =
+  '<h5>{{nickname}}</h5>' +
+  '<a target="_blank" href="https://globe.torproject.org/#/relay/{{fingerprint}}" class="btn btn-default">' +
+    '<span class="glyphicon glyphicon-globe"></span> ' +
+    'View on Globe' +
+  '</a>';
+Mustache.parse(ToroidHandler._MARKER_POPUP_TEMPLATE);
+
 ToroidHandler._iconCreateFunction = function(cluster) {
   var n = cluster.getChildCount();
   var color = ToroidHandler._ICON_COLOR(n);
@@ -263,11 +274,27 @@ ToroidHandler.prototype.getQuery = function() {
 ToroidHandler.prototype.setRelays = function(relays) {
   this._relays = _.filter(relays, ToroidHandler._relayIsValid);
   this._markers = {};
+  this._markerPopups = {};
   this._markersAttached = {};
   _.each(this._relays, function(relay) {
     var id = relay.fingerprint;
     var latLng = new L.LatLng(relay.latitude, relay.longitude);
-    this._markers[id] = new L.Marker(latLng);
+    var popupHtml = Mustache.render(ToroidHandler._MARKER_POPUP_TEMPLATE, relay);
+    var marker = new L.Marker(latLng, {
+      title: relay.nickname,
+      alt: relay.nickname
+    }).on('click', function() {
+      if (_.has(this._markerPopups, id)) {
+        return;
+      }
+      var markerPopup =
+        Mustache.render(ToroidHandler._MARKER_POPUP_TEMPLATE, relay);
+      marker
+        .bindPopup(markerPopup)
+        .openPopup();
+      this._markerPopups[id] = markerPopup;
+    }.bind(this));
+    this._markers[id] = marker;
     this._markersAttached[id] = false;
   }.bind(this));
 };
