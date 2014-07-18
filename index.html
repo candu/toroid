@@ -345,14 +345,23 @@ function initHandler() {
   var map = new L.Map('map', {
     worldCopyJump: true
   });
-  map.on('locatefound', function() {
-    $('#btn_nearby').removeClass('loading');
-  });
-  map.on('locateerror', function() {
+  map.on('locationfound', function() {
+    loading.hide();
     $('#btn_nearby')
-      .removeClass('loading')
-      .addClass('disabled')
-      .prop('disabled', true);
+      .removeClass('disabled')
+      .prop('disabled', false);
+  })
+  .on('locationerror', function() {
+    loading.hide();
+    $('#btn_nearby')
+      .removeClass('btn-default')
+      .addClass('btn-danger');
+  })
+  .on('movestart', function() {
+    loading.show();
+  })
+  .on('moveend', function() {
+    loading.hide();
   });
   var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   var osmAttrib = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
@@ -404,7 +413,13 @@ d3.json('/tor.json', function(data) {
 });
 
 $('#btn_world').click(handler.viewWorld.bind(handler));
-$('#btn_nearby').click(handler.viewNearby.bind(handler));
+$('#btn_nearby').click(function() {
+  $(this)
+    .addClass('disabled')
+    .prop('disabled', true);
+  loading.show();
+  handler.viewNearby();
+});
 
 $('#search_toggle').click(function() {
   $('#chevron')
