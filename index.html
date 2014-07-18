@@ -342,6 +342,7 @@ ToroidHandler.prototype.executeQuery = function() {
 };
 
 function initHandler() {
+  var hasLoaded = false;
   var map = new L.Map('map', {
     worldCopyJump: true
   });
@@ -361,6 +362,10 @@ function initHandler() {
     loading.show();
   })
   .on('moveend', function() {
+    if (!hasLoaded) {
+      hasLoaded = true;
+      return;
+    }
     loading.hide();
   });
   var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
