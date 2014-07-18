@@ -144,23 +144,12 @@ html, body, #map {
 var LoadingIndicator = function(target) {
   this._target = target;
   this._spinner = new Spinner();
-  this._shown = false;
 };
 LoadingIndicator.prototype.show = function() {
-  console.log('show');
-  if (this._shown) {
-    return;
-  }
-  this._shown = true;
   $(this._target).removeClass('hide');
   this._spinner.spin(this._target);
 };
 LoadingIndicator.prototype.hide = function() {
-  console.log('hide');
-  if (!this._shown) {
-    return;
-  }
-  this._shown = false;
   $(this._target).addClass('hide');
   this._spinner.stop();
 };
@@ -361,6 +350,14 @@ function updateFlags() {
   handler.getQuery().setFlags(flags);
 }
 
+function executeQuery() {
+  loading.show();
+  window.setTimeout(function() {
+    handler.executeQuery();
+    loading.hide();
+  }, 0);
+}
+
 d3.json('/tor.json', function(data) {
   handler.setRelays(data.relays);
   updateFlags();
@@ -369,9 +366,9 @@ d3.json('/tor.json', function(data) {
   $('.flag').click(function() {
     $(this).toggleClass('text-muted');
     updateFlags();
-    handler.executeQuery();
+    executeQuery();
   });
-  var nameWatchdog = new WatchdogTimer(handler.executeQuery.bind(handler), 250);
+  var nameWatchdog = new WatchdogTimer(executeQuery, 250);
   $('#name_contains').keyup(function() {
     var nameContains = $(this).val();
     handler.getQuery().setNameContains(nameContains);
