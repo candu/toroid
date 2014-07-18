@@ -17,6 +17,8 @@
 
 <script src="//oss.maxcdn.com/underscorejs/1.6.0/underscore-min.js"></script>
 
+<script src="//oss.maxcdn.com/spinjs/2.0.1/spin.min.js"></script>
+
 <style>
 html, body, #map {
   min-width: 960px;
@@ -39,6 +41,17 @@ html, body, #map {
   bottom: 0;
   right: 0;
   padding: 10px;
+}
+
+#loading {
+  width: 64px;
+  height: 64px;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background-color: white;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+  border-radius: 4px;
 }
 
 #chevron {
@@ -89,11 +102,12 @@ html, body, #map {
     <div class="btn btn-default" id="btn_nearby">nearby</div>
   </div>
 </div>
+<div id="loading" class="hide"></div>
 <div id="search">
   <div class="panel-group" id="search_options">
     <div class="panel panel-default">
       <div class="panel-heading">
-        <span id="chevron" class="glyphicon glyphicon-chevron-up"></span>
+        <span id="chevron" class="text-muted glyphicon glyphicon-chevron-up"></span>
         <h4 class="panel-title">
           <a id="search_toggle" data-toggle="collapse" data-parent="#search_options" href="#panel_search_options">
             Search Tor Nodes
@@ -127,6 +141,65 @@ html, body, #map {
   </div>
 </div>
 <script>
+var LoadingIndicator = function(target) {
+  this._target = target;
+  this._spinner = new Spinner();
+  this._shown = false;
+};
+LoadingIndicator.prototype.show = function() {
+  console.log('show');
+  if (this._shown) {
+    return;
+  }
+  this._shown = true;
+  $(this._target).removeClass('hide');
+  this._spinner.spin(this._target);
+};
+LoadingIndicator.prototype.hide = function() {
+  console.log('hide');
+  if (!this._shown) {
+    return;
+  }
+  this._shown = false;
+  $(this._target).addClass('hide');
+  this._spinner.stop();
+};
+var loading = new LoadingIndicator(document.getElementById('loading'));
+loading.show();
+
+var WatchdogTimer = function(/* callback, dt, args */) {
+  var args = Array.prototype.slice.call(arguments);
+  var callback = args.shift();
+  var dt = args.shift();
+  this._originalCallback = callback;
+  this._dt = dt;
+  this._args = args;
+  this._timeout = null;
+};
+WatchdogTimer.prototype._callback = function() {
+  this._originalCallback.apply(null, this._args);
+};
+WatchdogTimer.prototype.args = function(/* args */) {
+  var args = Array.prototype.slice.call(arguments);
+  this._args = args;
+  return this;
+};
+WatchdogTimer.prototype.kick = function() {
+  window.clearTimeout(this._timeout);
+  this._timeout = window.setTimeout(this._callback.bind(this), this._dt);
+  return this;
+};
+WatchdogTimer.prototype.stop = function() {
+  window.clearTimeout(this._timeout);
+  this._timeout = null;
+  return this;
+};
+WatchdogTimer.prototype.stopAndCall = function() {
+  this.stop();
+  this._callback();
+  return this;
+};
+
 var ToroidQuery = function() {
   this._flags = [];
   this._nameContains = '';
@@ -292,16 +365,17 @@ d3.json('/tor.json', function(data) {
   handler.setRelays(data.relays);
   updateFlags();
   handler.executeQuery();
+  loading.hide();
   $('.flag').click(function() {
     $(this).toggleClass('text-muted');
     updateFlags();
     handler.executeQuery();
   });
+  var nameWatchdog = new WatchdogTimer(handler.executeQuery.bind(handler), 250);
   $('#name_contains').keyup(function() {
     var nameContains = $(this).val();
-    console.log(nameContains);
     handler.getQuery().setNameContains(nameContains);
-    handler.executeQuery();
+    nameWatchdog.kick();
   });
 });
 
