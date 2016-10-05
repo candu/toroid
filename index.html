@@ -369,8 +369,8 @@ function initHandler() {
     }
     loading.hide();
   });
-  var osmUrl = 'http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  var osmAttrib = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib = 'Map data &copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
   var osm = new L.TileLayer(osmUrl, {minZoom: 2, maxZoom: 16, attribution: osmAttrib});
   map.addLayer(osm);
 
