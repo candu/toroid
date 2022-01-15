@@ -1,0 +1,438 @@
+<html>
+<head>
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" />
+<title>toroid - Tor Node Map</title>
+
+<script src="//oss.maxcdn.com/jquery/2.1.1/jquery.min.js"></script>
+
+<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+
+<script src="//oss.maxcdn.com/d3js/3.4.6/d3.min.js"></script>
+
+<link rel="stylesheet" href="//oss.maxcdn.com/leaflet/0.7.2/leaflet.css" />
+<script src="//oss.maxcdn.com/leaflet/0.7.2/leaflet.js"></script>
+
+<link rel="stylesheet" href="/MarkerCluster.css" />
+<script src="/leaflet.markercluster.js"></script>
+
+<script src="//oss.maxcdn.com/underscorejs/1.6.0/underscore-min.js"></script>
+
+<script src="//oss.maxcdn.com/spinjs/2.0.1/spin.min.js"></script>
+
+<script src="//oss.maxcdn.com/mustache.js/0.8.1/mustache.min.js"></script>
+
+<style>
+html, body, #map {
+  min-width: 960px;
+  min-height: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+#nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 10px;
+}
+
+#search {
+  width: 480px;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 10px;
+}
+
+#loading {
+  width: 64px;
+  height: 64px;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background-color: white;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+  border-radius: 4px;
+}
+
+#chevron {
+  float: right;
+}
+
+#flags {
+  font-size: 18px;
+}
+
+.flag {
+  cursor: pointer;
+  display: inline-block;
+  padding: 6px;
+  border-radius: 6px;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.flag.text-muted {
+  color: #999;
+  opacity: 0.75;
+}
+
+.flag:hover {
+  background-color: #eee;
+}
+
+.marker-cluster {
+  background-clip: padding-box;
+}
+
+.marker-cluster > div {
+  text-align: center;
+  font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+}
+
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="nav">
+  <div class="btn-group">
+    <div class="btn btn-default" id="btn_world">world</div>
+    <div class="btn btn-default" id="btn_nearby">nearby</div>
+  </div>
+  <a target="_blank" class="btn btn-default" href="https://github.com/candu/toroid">github</a>
+</div>
+<div id="loading" class="hide"></div>
+<div id="search">
+  <div class="panel-group" id="search_options">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <span id="chevron" class="text-muted glyphicon glyphicon-chevron-up"></span>
+        <h4 class="panel-title">
+          <a id="search_toggle" data-toggle="collapse" data-parent="#search_options" href="#panel_search_options">
+            Search Tor Nodes
+          </a>
+        </h4>
+      </div>
+      <div id="panel_search_options" class="panel-collapse collapse">
+        <div class="panel-body">
+          <h5>by flags</h5>
+          <div id="flags">
+            <span class="flag fa fa-bolt text-muted" title="Fast" data-flag="Fast"></span>
+            <span class="flag fa fa-code-fork" title="Running" data-flag="Running"></span>
+            <span class="flag fa fa-warning text-muted" title="BadExit" data-flag="BadExit"></span>
+            <span class="flag fa fa-user-md text-muted" title="Authority" data-flag="Authority"></span>
+            <span class="flag fa fa-shield text-muted" title="Guard" data-flag="Guard"></span>
+            <span class="flag fa fa-book text-muted" title="HSDir" data-flag="HSDir"></span>
+            <span class="flag fa fa-info text-muted" title="Named" data-flag="Named"></span>
+            <span class="flag fa fa-anchor text-muted" title="Stable" data-flag="Stable"></span>
+            <span class="flag fa fa-folder text-muted" title="V2Dir" data-flag="V2Dir"></span>
+            <span class="flag fa fa-check text-muted" title="Valid" data-flag="Valid"></span>
+            <span class="flag fa fa-question text-muted" title="Unnamed" data-flag="Unnamed"></span>
+            <span class="flag fa fa-sign-out text-muted" title="Exit" data-flag="Exit"></span>
+          </div>
+          <h5>by name</h5>
+          <div class="form-group">
+            <input class="form-control" id="name_contains" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+var LoadingIndicator = function(target) {
+  this._target = target;
+  this._spinner = new Spinner();
+};
+LoadingIndicator.prototype.show = function() {
+  $(this._target).removeClass('hide');
+  this._spinner.spin(this._target);
+};
+LoadingIndicator.prototype.hide = function() {
+  $(this._target).addClass('hide');
+  this._spinner.stop();
+};
+var loading = new LoadingIndicator(document.getElementById('loading'));
+loading.show();
+
+var WatchdogTimer = function(/* callback, dt, args */) {
+  var args = Array.prototype.slice.call(arguments);
+  var callback = args.shift();
+  var dt = args.shift();
+  this._originalCallback = callback;
+  this._dt = dt;
+  this._args = args;
+  this._timeout = null;
+};
+WatchdogTimer.prototype._callback = function() {
+  this._originalCallback.apply(null, this._args);
+};
+WatchdogTimer.prototype.args = function(/* args */) {
+  var args = Array.prototype.slice.call(arguments);
+  this._args = args;
+  return this;
+};
+WatchdogTimer.prototype.kick = function() {
+  window.clearTimeout(this._timeout);
+  this._timeout = window.setTimeout(this._callback.bind(this), this._dt);
+  return this;
+};
+WatchdogTimer.prototype.stop = function() {
+  window.clearTimeout(this._timeout);
+  this._timeout = null;
+  return this;
+};
+WatchdogTimer.prototype.stopAndCall = function() {
+  this.stop();
+  this._callback();
+  return this;
+};
+
+var ToroidQuery = function() {
+  this._flags = [];
+  this._nameContains = '';
+};
+ToroidQuery.prototype.getFlags = function() {
+  return this._flags;
+};
+ToroidQuery.prototype.setFlags = function(flags) {
+  this._flags = flags;
+  return this;
+};
+ToroidQuery.prototype.getNameContains = function() {
+  return this._nameContains;
+};
+ToroidQuery.prototype.setNameContains = function(nameContains) {
+  this._nameContains = nameContains.toLowerCase();
+};
+ToroidQuery.prototype.matches = function(relay) {
+  for (var i = 0; i < this._flags.length; i++) {
+    if (!_.contains(relay.flags, this._flags[i])) {
+      return false;
+    }
+  }
+  var nickname = relay.nickname.toLowerCase();
+  return nickname.indexOf(this._nameContains) !== -1;
+};
+
+var ToroidHandler = function(map, query) {
+  this._map = map;
+  this._query = query;
+  this._relays = [];
+  this._markers = {};
+  this._markersAttached = {};
+  this._markerLayer = new L.MarkerClusterGroup({
+    iconCreateFunction: ToroidHandler._iconCreateFunction
+  });
+  this._map.addLayer(this._markerLayer);
+};
+ToroidHandler._ICON_COLOR = d3.scale.sqrt()
+  .domain([50, 450, 1800])
+  .range([d3.rgb(110, 204, 57), d3.rgb(240, 194, 12), d3.rgb(241, 128, 23)])
+  .clamp(true);
+ToroidHandler._ICON_SIZE = d3.scale.sqrt()
+  .domain([50, 800])
+  .rangeRound([20, 80])
+  .clamp(true);
+ToroidHandler._FONT_SIZE = d3.scale.sqrt()
+  .domain([200, 1250])
+  .rangeRound([12, 30])
+  .clamp(true);
+
+ToroidHandler._MARKER_POPUP_TEMPLATE =
+  '<h5>{{nickname}}</h5>' +
+  '<a target="_blank" href="https://globe.torproject.org/#/relay/{{fingerprint}}" class="btn btn-default">' +
+    '<span class="glyphicon glyphicon-globe"></span> ' +
+    'View on Globe' +
+  '</a>';
+Mustache.parse(ToroidHandler._MARKER_POPUP_TEMPLATE);
+
+ToroidHandler._iconCreateFunction = function(cluster) {
+  var n = cluster.getChildCount();
+  var color = ToroidHandler._ICON_COLOR(n);
+  var textColor = d3.rgb(color).darker(1);
+  var size = ToroidHandler._ICON_SIZE(n);
+  var fontSize = ToroidHandler._FONT_SIZE(n);
+  var radius = Math.floor(size / 2);
+  var divStyle = 'width: ' + size + 'px; height: ' + size + 'px; border: 1px solid ' + textColor + '; border-radius: ' + radius + 'px; background-color: ' + color;
+  var spanStyle = 'color: ' + textColor + '; font-size: ' + fontSize + 'px; line-height: ' + size + 'px;';
+  return new L.DivIcon({
+    iconSize: new L.Point(size, size),
+    html: '<div style="' + divStyle + '"><span style="' + spanStyle + '">' + n + '</span></div>',
+    className: 'marker-cluster'
+  });
+};
+ToroidHandler._relayIsValid = function(relay) {
+  return _.has(relay, 'latitude') && _.has(relay, 'longitude');
+};
+ToroidHandler.prototype.getQuery = function() {
+  return this._query;
+};
+ToroidHandler.prototype.setRelays = function(relays) {
+  this._relays = _.filter(relays, ToroidHandler._relayIsValid);
+  this._markers = {};
+  this._markerPopups = {};
+  this._markersAttached = {};
+  _.each(this._relays, function(relay) {
+    var id = relay.fingerprint;
+    var latLng = new L.LatLng(relay.latitude, relay.longitude);
+    var popupHtml = Mustache.render(ToroidHandler._MARKER_POPUP_TEMPLATE, relay);
+    var marker = new L.Marker(latLng, {
+      title: relay.nickname,
+      alt: relay.nickname
+    }).on('click', function() {
+      if (_.has(this._markerPopups, id)) {
+        return;
+      }
+      var markerPopup =
+        Mustache.render(ToroidHandler._MARKER_POPUP_TEMPLATE, relay);
+      marker
+        .bindPopup(markerPopup)
+        .openPopup();
+      this._markerPopups[id] = markerPopup;
+    }.bind(this));
+    this._markers[id] = marker;
+    this._markersAttached[id] = false;
+  }.bind(this));
+};
+ToroidHandler.prototype.viewWorld = function() {
+  this._map.setView(new L.LatLng(0, 0), 2);
+  return this;
+};
+ToroidHandler.prototype.viewNearby = function() {
+  this._map.locate({
+    setView: true,
+    maxZoom: this._map.getZoom()
+  });
+};
+ToroidHandler.prototype.executeQuery = function() {
+  var toAdd = [];
+  var toAddNotAttached = [];
+  var toRemove = [];
+  _.each(this._relays, function(relay) {
+    var id = relay.fingerprint;
+    var matches = this._query.matches(relay);
+    var attached = this._markersAttached[id];
+    var marker = this._markers[id];
+    if (matches) {
+      toAdd.push(marker);
+      if (!attached) {
+        toAddNotAttached.push(marker);
+      }
+      this._markersAttached[id] = true;
+    } else if (!matches && attached) {
+      toRemove.push(marker);
+      this._markersAttached[id] = false;
+    }
+  }.bind(this));
+  // NOTE: see https://github.com/Leaflet/Leaflet.markercluster/issues/59#issuecomment-9320628
+  // for the basis of this heuristic - in short, removing N markers takes about
+  // twice as long as adding N markers.
+  if (toRemove.length * 2 < (toAdd.length - toAddNotAttached.length)) {
+    this._markerLayer.removeLayers(toRemove);
+    this._markerLayer.addLayers(toAddNotAttached);
+  } else {
+    this._markerLayer.clearLayers();
+    this._markerLayer.addLayers(toAdd);
+  }
+  return this;
+};
+
+function initHandler() {
+  var hasLoaded = false;
+  var map = new L.Map('map', {
+    worldCopyJump: true
+  });
+  map.on('locationfound', function() {
+    loading.hide();
+    $('#btn_nearby')
+      .removeClass('disabled')
+      .prop('disabled', false);
+  })
+  .on('locationerror', function() {
+    loading.hide();
+    $('#btn_nearby')
+      .removeClass('btn-default')
+      .addClass('btn-danger');
+  })
+  .on('movestart', function() {
+    loading.show();
+  })
+  .on('moveend', function() {
+    if (!hasLoaded) {
+      hasLoaded = true;
+      return;
+    }
+    loading.hide();
+  });
+  var osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  var osmAttrib = 'Map data &copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
+  var osm = new L.TileLayer(osmUrl, {minZoom: 2, maxZoom: 16, attribution: osmAttrib});
+  map.addLayer(osm);
+
+  var query = new ToroidQuery();
+
+  return new ToroidHandler(map, query);
+}
+
+var handler = initHandler();
+handler.viewWorld();
+
+function updateFlags() {
+  var flags = [];
+  $('.flag').each(function(i, flag) {
+    if (!$(flag).hasClass('text-muted')) {
+      flags.push($(flag).data('flag'));
+    }
+  });
+  handler.getQuery().setFlags(flags);
+}
+
+function executeQuery() {
+  loading.show();
+  window.setTimeout(function() {
+    handler.executeQuery();
+    loading.hide();
+  }, 0);
+}
+
+d3.json('/tor.json', function(data) {
+  handler.setRelays(data.relays);
+  updateFlags();
+  handler.executeQuery();
+  loading.hide();
+  $('.flag').click(function() {
+    $(this).toggleClass('text-muted');
+    updateFlags();
+    executeQuery();
+  });
+  var nameWatchdog = new WatchdogTimer(executeQuery, 250);
+  $('#name_contains').keyup(function() {
+    var nameContains = $(this).val();
+    handler.getQuery().setNameContains(nameContains);
+    nameWatchdog.kick();
+  });
+});
+
+$('#btn_world').click(handler.viewWorld.bind(handler));
+$('#btn_nearby').click(function() {
+  $(this)
+    .addClass('disabled')
+    .prop('disabled', true);
+  loading.show();
+  handler.viewNearby();
+});
+
+$('#search_toggle').click(function() {
+  $('#chevron')
+    .toggleClass('glyphicon-chevron-down')
+    .toggleClass('glyphicon-chevron-up');
+});
+</script>
+</body>
+</html>
